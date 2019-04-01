@@ -51,4 +51,4 @@ function example_basic(; verbose = true)
     @test y_value ≈ 0.2
 end
 
-example_basic(verbose = false)
+example_basic(verbose = true)
