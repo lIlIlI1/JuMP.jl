@@ -27,8 +27,10 @@ end
 @constraint(model, [i=1:steps,j=1:2], var[j] == sum(velocity[j,:])/steps)#velocity average
 @constraint(model, position[:, 1] .== [30.0, 30.0]) #initial condition
 @constraint(model, velocity[:, 1] .== [0.0, 0.0])
+#@constraint(model, position[2, steps] == 70.0) #final condition # not using cuz only return all zero values 
 #maintain y 
 @NLconstraint(model, [i=2:steps, j=2], abs(sind(position[1, i]) + sind(position[1, i] + position[2, i]) - (sqrt(3)+1)/2.0)<=0.001)
+@NLconstraint(model, abs(x[steps]-0.9)<=0.001)#final position
 #decrease in x 
 @constraint(model, [i=2:steps], x[i] - x[i-1] <= 0.0)
 @objective(model, Min, sum((velocity[1, i]-var[1]).^2/steps for i in 1:steps))#min the vel variance in joint 1
