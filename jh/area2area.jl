@@ -1,4 +1,4 @@
-using JuMP, Ipopt
+using JuMP, Ipopt, DelimitedFiles
 ##################
 ##using a 2-link arm for grinding, given the start and end position, also considering the size of the grinding pad, find the optimized 
 ##joint angles using objective functions:
@@ -9,10 +9,21 @@ model = Model(with_optimizer(Ipopt.Optimizer,print_level = 0))
 
 dt = 0.1 
 steps = 40
-final_x = 0.9 #final x position 
-R = 0.01#radius of grinding tool 
-y_l = (sqrt(3)+1)/2.0 - R
-y_u = (sqrt(3)+1)/2.0 + R
+M1 = 1
+M2 = 1
+l1 = 1#200
+l2 = 1#200
+init_theta1 = 30.0
+final_theta1 = 30.0
+init_theta2 = 30.0
+final_theta2 = 90.0
+#final_x = 0.9 #final x position 
+final_x = l1*cosd(final_theta1) + l2*cosd(final_theta1+final_theta2)
+R = 0.01*l1#radius of grinding tool 
+#y_l = (sqrt(3)+1)/2.0 - R
+#y_u = (sqrt(3)+1)/2.0 + R
+y_l = l1*sind(final_theta1) + l2*sind(final_theta1+final_theta2) - R
+y_u = l1*sind(final_theta1) + l2*sind(final_theta1+final_theta2) + R
 
 @variables model begin
     theta[1:2, 1:steps]
@@ -29,8 +40,8 @@ end
 @constraint(model, [i=2:steps, j=1:2], theta_dot[j, i] == theta_dot[j, i-1] + theta_ddot[j, i-1]*dt)
 @constraint(model, [i=2:steps, j=1:2], theta[j, i] == theta[j, i-1] + theta_dot[j, i-1]*dt)
 #cartesian coordinates
-@NLconstraint(model, [i=1:steps], x[i] == cosd(theta[1,i]) + cosd(theta[1,i]+theta[2,i]))
-@NLconstraint(model, [i=1:steps], y[i] == sind(theta[1,i]) + sind(theta[1,i]+theta[2,i]))
+@NLconstraint(model, [i=1:steps], x[i] == l1*cosd(theta[1,i]) + l2*cosd(theta[1,i]+theta[2,i]))
+@NLconstraint(model, [i=1:steps], y[i] == l1*sind(theta[1,i]) + l2*sind(theta[1,i]+theta[2,i])) 
 #joint angle constraints
 @constraint(model, [i=1:steps, j=1], -360.0 <= theta[j, i] <= 360.0)
 @constraint(model, [i=1:steps, j=2],    0.0 <= theta[j, i] <= 180.0)
@@ -40,13 +51,17 @@ end
 #joint accelaration constraints
 
 #calculating torques
-@NLconstraint(model, [i=1:steps], C[1, i] == -sind(theta[2, i])*(2*theta_ddot[1, i]*theta_ddot[2, i]+theta_ddot[2,i]^2))
-@NLconstraint(model, [i=1:steps], C[2, i] == -sind(theta[2, i])*(theta_dot[1, i]*theta[2, i]))
+@NLconstraint(model, [i=1:steps], B[1, 1, i] == (M1+M2)*l1^2+M2*l2^2+2M1*l1*l2*cosd(theta[2,i]))
+@NLconstraint(model, [i=1:steps], B[1, 2, i] == M2*l2^2+M2*l1*l2*cosd(theta[2,i]))
+@NLconstraint(model, [i=1:steps], B[2, 1, i] == M2*l2^2+M2*l1*l2*cosd(theta[2,i]))
+@NLconstraint(model, [i=1:steps], B[2, 2, i] == M2*l2^2)
+@NLconstraint(model, [i=1:steps], C[1, i] == -M2*l1*l2*sind(theta[2, i])*(2*theta_ddot[1, i]*theta_ddot[2, i]+theta_ddot[2,i]^2))
+@NLconstraint(model, [i=1:steps], C[2, i] == -M2*l1*l2*sind(theta[2, i])*(theta_dot[1, i]*theta[2, i]))
 @constraint(model, [i=1:steps, j=1:2], tau[j, i] == B[j, 1, i] * theta_ddot[1, i] + B[j, 2, i] * theta_ddot[2, i] + C[j,i])
 #the object is to have smooth theta_dot
 @constraint(model, [i=1:steps,j=1:2], var[j] == sum(theta_dot[j,:])/steps)#theta_dot average
 #initial condition
-@constraint(model, theta[:, 1] .== [30.0, 30.0]) 
+@constraint(model, theta[:, 1] .== [init_theta1, init_theta2]) 
 @constraint(model, theta_dot[:, 1] .== [0.0, 0.0])
 @constraint(model, theta_ddot[:, 1].== [0.0, 0.0])
 #@constraint(model, theta[2, steps] == 70.0) #final condition # not using cuz only return all zero values 
@@ -80,3 +95,5 @@ println(a1)
 println(a2)
 println(tau1)
 println(tau2)
+writedlm("theta1.csv", q1, ',')
+writedlm("theta2.csv", q2, ',')
