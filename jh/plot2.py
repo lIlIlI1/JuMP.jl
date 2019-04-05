@@ -16,19 +16,35 @@ class Arm(object):
 	def __init__(self):
 		self.theta1 = []
 		self.theta2 = []
+		self.ideal_theta1 = []
+		self.ideal_theta2 = []
 		with open('theta1.csv') as csv_file:
-			print("read theta1")
+			print("read ideal theta1")
 			csv_reader = csv.reader(csv_file, delimiter=',')
 			for row in csv_reader:
 				#temp = map(float, row[:])
 				self.theta1.append(float(row[0]))#temp)
 
 		with open('theta2.csv') as csv_file:
-			print("read theta2")
+			print("read ideal theta2")
 			csv_reader = csv.reader(csv_file, delimiter=',')
 			for row in csv_reader:
 				#temp = float#map(float, row[:])
 				self.theta2.append(float(row[0]))
+
+		with open('ideal_theta1.csv') as csv_file:
+			print("read theta1")
+			csv_reader = csv.reader(csv_file, delimiter=',')
+			for row in csv_reader:
+				#temp = map(float, row[:])
+				self.ideal_theta1.append(float(row[0]))#temp)
+
+		with open('ideal_theta2.csv') as csv_file:
+			print("read theta2")
+			csv_reader = csv.reader(csv_file, delimiter=',')
+			for row in csv_reader:
+				#temp = float#map(float, row[:])
+				self.ideal_theta2.append(float(row[0]))
 		#print("theta1")
 		#print(self.theta1)
 		#print("theta2")
@@ -41,6 +57,10 @@ class Arm(object):
 		self.j2 = [0.0, 0.0]
 		self.ee = [0.0, 0.0]
 		self.steps = 0
+
+		self.ideal_j1 = [ORIGIN_X, ORIGIN_Y] 
+		self.ideal_j2 = [0.0, 0.0]
+		self.ideal_ee = [0.0, 0.0]
 		#self.l1 = 200
 		#self.l2 = 200
 	#manage traffic light colors
@@ -52,6 +72,11 @@ class Arm(object):
 		self.ee[0] = LENGTH1*cos(self.theta1[steps]*3.14/180.0) + LENGTH2*cos(self.theta1[steps]*3.14/180.0+self.theta2[steps]*3.14/180.0)  + self.j1[0]
 		self.ee[1] = LENGTH1*sin(self.theta1[steps]*3.14/180.0) + LENGTH2*sin(self.theta1[steps]*3.14/180.0+self.theta2[steps]*3.14/180.0)  + self.j1[1]
 
+		self.ideal_j2[0] = LENGTH1*cos(self.ideal_theta1[steps]*3.14/180.0) + self.ideal_j1[0]
+		self.ideal_j2[1] = LENGTH1*sin(self.ideal_theta1[steps]*3.14/180.0) + self.ideal_j1[1]
+		self.ideal_ee[0] = LENGTH1*cos(self.ideal_theta1[steps]*3.14/180.0) + LENGTH2*cos(self.ideal_theta1[steps]*3.14/180.0+self.ideal_theta2[steps]*3.14/180.0)  + self.ideal_j1[0]
+		self.ideal_ee[1] = LENGTH1*sin(self.ideal_theta1[steps]*3.14/180.0) + LENGTH2*sin(self.ideal_theta1[steps]*3.14/180.0+self.ideal_theta2[steps]*3.14/180.0)  + self.ideal_j1[1]
+
 	#update traffic using car_list and traffic_light_list
 	def render(self,dt): 
 		if self.viewer is None:
@@ -62,8 +87,11 @@ class Arm(object):
 		else:
 			self.steps = 0
 			self.viewer.ee_trace = pyglet.graphics.Batch()
+			self.viewer.ee_trace_ideal = pyglet.graphics.Batch()
+			self.viewer.arm_batch = pyglet.graphics.Batch()
+			self.viewer.arm_batch_ideal = pyglet.graphics.Batch()
 		#print(len(self.car_list))
-		self.viewer.update(dt, self.j1, self.j2, self.ee)
+		self.viewer.update(dt, self.j1, self.j2, self.ee, self.ideal_j1, self.ideal_j2, self.ideal_ee)
 
 class Viewer(pyglet.window.Window):
 	def __init__(self):
@@ -73,8 +101,10 @@ class Viewer(pyglet.window.Window):
 		pyglet.gl.glClearColor(0.8, 0.8, 0.8, 1) #background color
 		bg_vertices = [ORIGIN_X+LENGTH1*cos(INIT_1*3.14/180.0)+LENGTH2*cos(INIT_1*3.14/180.0+INIT_2*3.14/180.0), ORIGIN_Y+LENGTH1*sin(INIT_1*3.14/180.0)+LENGTH2*sin(INIT_1*3.14/180.0+INIT_2*3.14/180.0)]
 		self.bg = pyglet.graphics.Batch() 
-		self.arm_batch = None 
+		self.arm_batch = pyglet.graphics.Batch()
 		self.ee_trace = pyglet.graphics.Batch()
+		self.arm_batch_ideal = pyglet.graphics.Batch()
+		self.ee_trace_ideal = pyglet.graphics.Batch()
 		#self.arm = arm
 		#for i in range(2):
 		self.bg.add(2, pyglet.gl.GL_LINES, None,
@@ -93,22 +123,35 @@ class Viewer(pyglet.window.Window):
 		self.bg.draw()
 		self.arm_batch.draw()
 		self.ee_trace.draw()
+		self.arm_batch_ideal.draw()
+		self.ee_trace_ideal.draw()
 	#update info of cars and traffic lights, called at time interval defined in function: pyglet.clock.schedule_interval()
-	def update(self, dt, j1, j2, ee):
+	def update(self, dt, j1, j2, ee, ideal_j1, ideal_j2, ideal_ee):
 		#print(j1)
 		#print(j2)
 		#print(ee)
 		arm_batch = pyglet.graphics.Batch()
+		arm_batch_ideal = pyglet.graphics.Batch()
 		ee_trace = pyglet.graphics.Batch()
-		arm_batch.add(2, pyglet.gl.GL_LINES, None,
+		ee_trace_ideal = pyglet.graphics.Batch()
+		self.arm_batch.add(2, pyglet.gl.GL_LINES, None,
                              ('v2f', [j1[0], j1[1], j2[0],j2[1]]), 
                              ('c3B', (86, 10, 29)*2))
-		arm_batch.add(2, pyglet.gl.GL_LINES, None,
+		self.arm_batch.add(2, pyglet.gl.GL_LINES, None,
                              ('v2f', [j2[0], j2[1], ee[0],ee[1]]), 
                              ('c3B', (86, 10, 29)*2))
 		self.ee_trace.add(1, pyglet.gl.GL_POINTS, None, ('v2f', (ee[0], ee[1])), ('c3B', (0, 0, 255)))
+		# plot for ideal ones
+		self.arm_batch_ideal.add(2, pyglet.gl.GL_LINES, None,
+                             ('v2f', [ideal_j1[0], ideal_j1[1], ideal_j2[0],ideal_j2[1]]), 
+                             ('c3B', (186, 10, 29)*2))
+		self.arm_batch_ideal.add(2, pyglet.gl.GL_LINES, None,
+                             ('v2f', [ideal_j2[0], ideal_j2[1], ideal_ee[0],ideal_ee[1]]), 
+                             ('c3B', (186, 10, 29)*2))
+		self.ee_trace_ideal.add(1, pyglet.gl.GL_POINTS, None, ('v2f', (ideal_ee[0], ideal_ee[1])), ('c3B', (0, 255, 0)))
 
-		self.arm_batch = arm_batch
+
+
 
 if __name__ == '__main__':
 	env = Arm()
